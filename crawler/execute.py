@@ -1,37 +1,58 @@
-from scrape import *
-from google.cloud import storage
+from scrape import crawlReddit, uploadtoGCS
+from db import RedditLogDB
+from datetime import date, datetime, timedelta, timezone
 import uuid
+import os
 
 def main():
-    start_time = (2020, 2, 12, 12, 0, 0)
-    end_time = (2020, 2, 13, 13, 29, 0)
-    sub = "Vodafone"
-    file_name = "reddit_test_{}.csv".format(uuid.uuid4())
+    # Set vairables
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "crawler-service-account-key.json"
     bucket_name = "g09-datasets"
-    file_name = "reddit_test_{}.csv".format(uuid.uuid4())   # change to unique name with datetime.
+    sub = "Vodafone"
+    day_period = 1
+
+    # Initalise MySQL db object
+    logDB = RedditLogDB(host='104.196.70.209', user='k8s', password='', db='reddit', tablename='reddit_log')
+
+    # Evaluate crawl period, if empty use current time
+    endDateTime = logDB.earliestQuery()
+    if not endDateTime:
+        endDateTime = datetime.utcnow()
+    else:
+        # For some reason it returns a tuple if its not empty
+        endDateTime = endDateTime[0]
+        
+    startDateTime = endDateTime - timedelta(days = day_period)
+
+    # Log data
+    success, logID = logDB.startCrawl(startDateTime, endDateTime, sub)
+
+    # Set relevant directories
+    file_name = "{}_{}.csv".format(startDateTime.strftime('%Y-%m-%d-%H-%M-%S'), endDateTime.strftime('%Y-%m-%d-%H-%M-%S'))
     source_blob_path = "/tmp/" + file_name
-    destination_blob_path = "reddit/crawl/" + file_name
-    subbreddit_name = 'RocketLeague'
+    destination_blob_path = "reddit/crawl/{}/{}".format(sub, file_name)
 
-    print("Bucket name: {}".format(bucket_name))
-    print("Bucket destination path: {}".format(destination_blob_path))
-    print("Subbreddit: {}".format(subbreddit_name))
+    # Crawl subreddit
+    print("Beginning crawl.")
+    df, success_scrape = crawlReddit(startDateTime, endDateTime, sub)
+    if success_scrape:
+        print("Successfully finished crawl.")
+    else:
+        print("Crawl failed.")
 
-    df = crawlReddit(start_time, end_time, sub)
-    scraped_data.to_csv(source_blob_path)
-    succeeded = uploadtoGCS(bucket_name, source_blob_path, destination_blob_path)
+    # Save dataframe to csv
+    df.to_csv(source_blob_path)
 
-    print(succeeded)
+    # Upload to GCS
+    print("Uploading to GCS.")
+    success_to_GCS = uploadtoGCS(bucket_name, source_blob_path, destination_blob_path)
+    if success_to_GCS:
+        print("Successfully uploaded to GCS.")
+    else:
+        print("Failed to upload to GCS.")
 
+    # Log data
+    logDB.endCrawl(logID, len(df), (success_scrape and success_to_GCS) )
 
-def uploadtoGCS(bucket_name, source_blob_path, destination_blob_path):
-    """Uploads a file to the bucket."""
-    storage_client = storage.Client.from_service_account_json('./cogniflare-rd-1298fa5958c1.json')
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(destination_blob_path)
-
-    blob.upload_from_filename(source_blob_path)
-    return True
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
