@@ -17,21 +17,24 @@ class LogDB:
     def createTable(self):
         print("Creating table...")
         stmt = """
-            CREATE TABLE `reddit_log` (
+            CREATE TABLE `{}` (
             `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
             `start_date` DATETIME DEFAULT NULL,
             `end_date` DATETIME DEFAULT NULL,
             `crawl_start` DATETIME NULL DEFAULT NULL,
             `crawl_end` DATETIME NULL DEFAULT NULL,
             `context` text,
-            `length` INT UNSIGNED NOT NULL DEF,
+            `length` INT UNSIGNED NOT NULL DEFAULT 0,
             `success` boolean,
             PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-        """
-        print("Table created")
-        self.cursor.execute(stmt)
-        self.connection.commit()
+        """.format(self.tablename)
+        try:
+            self.cursor.execute(stmt)
+            self.connection.commit()
+            print("Table created")
+        except Exception as e:
+            print("Could not create table failed with error: \n{})".format(e))
 
     def __init__(self, host, user, password, db, tablename):
         self.connection = pymysql.connect(
@@ -101,19 +104,19 @@ class RedditLogDB(LogDB):
         # Insert row to DB
         # stmt: SQL statement
         # return success, message
-        sql = "INSERT INTO reddit_log (start_date, end_date, crawl_start, context) VALUES (%s, %s, %s, %s)"
+        sql = "INSERT INTO {} (start_date, end_date, crawl_start, context) VALUES (%s, %s, %s, %s)".format(self.tablename)
         val = (start_date, end_date, dt.datetime.utcnow(), context)
         return self.insertRow(sql, val)
 
     def endCrawl(self, id, length, success):
-        sql = "UPDATE reddit_log SET success=%s, crawl_end=%s, length=%s WHERE id=%s"
+        sql = "UPDATE {} SET success=%s, crawl_end=%s, length=%s WHERE id=%s".format(self.tablename)
         val = (success, dt.datetime.utcnow(), length, id)
         return self.updateRow(sql, val)
 
     def earliestQuery(self):
         # reverse Find the next day to crawl
         # return None if no record
-        sql = "SELECT start_date FROM reddit_log ORDER BY start_date LIMIT 1"
+        sql = "SELECT start_date FROM {} ORDER BY start_date LIMIT 1".format(self.tablename)
         success, result = self.queryOne(sql)
         if result:
             return result

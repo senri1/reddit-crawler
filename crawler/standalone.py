@@ -23,7 +23,7 @@ else:
 # Save dataframe to csv
 df.to_csv(source_blob_path)
 
-# Upload to GCS
+# Upload to GCS 
 print("Uploading to GCS.")
 success_to_GCS = uploadtoGCS(bucket_name, source_blob_path, destination_blob_path)
 if success_to_GCS:

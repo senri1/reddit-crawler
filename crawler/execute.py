@@ -8,11 +8,12 @@ def main():
     # Set vairables
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "crawler-service-account-key.json"
     bucket_name = "g09-datasets"
-    sub = "Vodafone"
+    sub = "tmobile"
+    reddit_founded = datetime(2005,6,23,0,0,0)
     day_period = 365
 
     # Initalise MySQL db object
-    logDB = RedditLogDB(host='104.196.70.209', user='k8s', password='', db='reddit', tablename='reddit_log')
+    logDB = RedditLogDB(host='', user='k8s', password='', db='reddit', tablename='reddit_{}_log'.format(sub))
 
     # Evaluate crawl period, if empty use current time
     endDateTime = logDB.earliestQuery()
@@ -23,6 +24,9 @@ def main():
         endDateTime = endDateTime[0]
         
     startDateTime = endDateTime - timedelta(days = day_period)
+
+    if startDateTime < reddit_founded:
+        print("Attempting to scrape before reddit was founded, will not scrape.")
 
     # Log data
     success, logID = logDB.startCrawl(startDateTime, endDateTime, sub)
