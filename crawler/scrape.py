@@ -10,34 +10,41 @@ import time
 def getPushshiftData(start, end, sub):
 
     reddit_posts = []
+    # url to api endpoint
     url_template = ('https://api.pushshift.io/reddit/submission/search/'
                    '?subreddit={}&after={}&before={}&sort_type=created_utc&sort=asc&limit={}')
     info_template = ("Posts from {} to {} received.")
+    # will retry 10 times before failing
     retries = 0
     retry_limit = 10
-    while(int(start) < int(end)):
 
-        try:    
-            url = url_template.format(sub, str(start), end, 200)
-            retries = 0
-            received = requests.get(url)
+    # loop till start is less than end
+    while(int(start) < int(end)):
+    
+        url = url_template.format(sub, str(start), end, 200)
+        received = requests.get(url)
+        
+        if received.status_code != 200:
+            if retries == retry_limit:
+                print("Retry limit of {} reached, aborting scrape.".format(retry_limit))
+                return reddit_posts, False
+            else:
+                retries += 1
+                print("Error code : {}".format(received.status_code))
+                print("Retrying")
+                time.sleep(0.1)
+
+        else:
+            retries = 0    
             json_posts = json.loads(received.text)['data']
             if len(json_posts) != 0 :
                 reddit_posts += json_posts
                 print(info_template.format(datetime.utcfromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.utcfromtimestamp(reddit_posts[-1]['created_utc']).strftime('%Y-%m-%d %H:%M:%S')))
                 start = reddit_posts[-1]['created_utc']
+
+            # if data is empty all data is gathered
             else:
                 return reddit_posts, True
-
-        except Exception as e:
-            if retries == retry_limit:
-                print("Retry limit of {} reached, aborting scrape.".format(retry_limit))
-                return reddit_posts, False
-            else:
-                print("Error : {}".format(e))
-                print("Retrying")
-                time.sleep(0.1)
-                retries += 1
 
     return reddit_posts, True
 

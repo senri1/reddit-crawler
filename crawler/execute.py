@@ -9,7 +9,7 @@ def main():
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "crawler-service-account-key.json"
     bucket_name = "g09-datasets"
     sub = "Vodafone"
-    day_period = 1
+    day_period = 365
 
     # Initalise MySQL db object
     logDB = RedditLogDB(host='104.196.70.209', user='k8s', password='', db='reddit', tablename='reddit_log')
